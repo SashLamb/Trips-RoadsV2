@@ -1,0 +1,21 @@
+{
+  "name": "trips-and-roads-v2",
+  "version": "1.0.0",
+  "description": "Planificateur de Road Trip local",
+  "main": "main/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SashLamb/Trips-RoadsV2.git"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
