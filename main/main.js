@@ -1,6 +1,7 @@
 // main/main.js
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const { initDatabase } = require('./database');
 
 function createWindow() {
     // Crée la fenêtre du navigateur de bureau
@@ -22,7 +23,10 @@ function createWindow() {
 }
 
 // Quand Electron est prêt, il crée la fenêtre
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    initDatabase();
+    createWindow();
+});
 
 // Quitter quand toutes les fenêtres sont fermées (sauf sur Mac)
 app.on('window-all-closed', () => {
