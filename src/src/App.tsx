@@ -1,11 +1,12 @@
-// src/src/App.tsx
-function App() {
-  return (
-      <div style={{ padding: '30px', fontFamily: 'sans-serif', color: '#333' }}>
-        <h1>🌍 Trips & Roads V2</h1>
-        <p>L'application est initialisée en React + TypeScript !</p>
-      </div>
-  );
-}
+import { Routes, Route } from 'react-router-dom'
+import TripsList from './pages/TripsList'
+import TripDetail from './pages/TripDetail'
 
-export default App;
+export default function App() {
+    return (
+        <Routes>
+            <Route path="/" element={<TripsList />} />
+            <Route path="/trips/:id" element={<TripDetail />} />
+        </Routes>
+    )
+}
