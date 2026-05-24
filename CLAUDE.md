@@ -11,14 +11,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Two-process Electron architecture:
 
 - **Main process** (`main/`, Node.js CommonJS) — owns SQLite via `better-sqlite3`, handles OS interactions (file system, PDF export), and exposes functionality to the renderer via IPC handlers.
-- **Renderer process** (`src/`, React 19 + TypeScript + Vite) — the full UI. Communicates with the main process exclusively through the IPC bridge.
+- **Renderer process** (`src/src/`, React 19 + TypeScript + Vite) — the full UI. Communicates with the main process exclusively through the IPC bridge.
+
+### File structure
+
+```
+Trips-and-RoadsV2/
+├── main/
+│   ├── main.js          # Electron main process, BrowserWindow, ipcMain handlers
+│   ├── preload.js       # contextBridge — exposes window.electronAPI to renderer
+│   └── database.js      # better-sqlite3 init, exports { db, initDatabase }
+├── src/                 # Vite project root (package.json, vite.config.ts, index.html)
+│   └── src/             # Actual React source files (App.tsx, main.tsx, etc.)
+├── database.db          # SQLite file at project root
+├── package.json         # Root package (Electron, better-sqlite3)
+└── CLAUDE.md
+```
+
+> **Important:** source files live at `src/src/`, not `src/`. The outer `src/` is the Vite project root.
 
 ### IPC bridge pattern
 
 All DB access and OS calls from the UI must go through IPC. The secure layout is:
-- `main/preload.js` — uses `contextBridge` to expose a typed API to the renderer.
+- `main/preload.js` — uses `contextBridge` to expose a typed API to the renderer as **`window.electronAPI`**.
 - `main/main.js` — registers `ipcMain.handle(channel, handler)` listeners.
-- `src/` — calls `window.api.<method>()` (never imports anything from `main/` directly).
+- `src/src/` — calls `window.electronAPI.<method>()` (never imports anything from `main/` directly).
+- `src/src/global.d.ts` — TypeScript interface `IElectronAPI` + `declare global { interface Window { electronAPI: IElectronAPI } }`.
 - `BrowserWindow` must be created with `contextIsolation: true` and `nodeIntegration: false`.
 
 ### Database schema (SQLite, `database.db` at project root)
@@ -35,12 +53,49 @@ All DB access and OS calls from the UI must go through IPC. The secure layout is
 
 All `id` fields are UUIDs generated in JS before insertion.
 
-### Core features (planned / in progress)
+## Current implementation status
 
-1. **Rich Markdown editor** — WYSIWYG on step `description`. Local images are copied by Electron and their absolute path is embedded in the Markdown string.
-2. **Leaflet map routing** — fetches route geometry online, saves it to `transports.route_geometry`, renders offline.
-3. **Multi-currency budgeting** — category breakdown with currency conversion to `main_currency`, displayed as charts.
-4. **PDF export** — uses Electron's `webContents.printToPDF()` on a hidden, print-optimized React view (`@media print`).
+### Done and working
+
+- Electron window launches with correct security settings (contextIsolation, no nodeIntegration).
+- IPC bridge boots: `preload.js` exposes `window.electronAPI` with `ping` and `openFile`.
+- `main.js` handles `ping-main` and `dialog:openFile` channels.
+- SQLite schema initializes on startup (all 5 tables created via `initDatabase()`).
+- TypeScript IPC types declared in `src/src/global.d.ts`.
+- Dev workflow functional: Vite HMR + Electron run simultaneously.
+- `App.tsx` has a working ping test screen (smoke-tests the IPC bridge end-to-end).
+- CSS design tokens (light + dark theme) in `src/src/index.css`.
+
+### Not yet implemented (to build)
+
+**IPC / backend (main process)**
+- No CRUD handlers for any entity: `road_trips`, `steps`, `transports`, `expenses`, `attachments`.
+- No file-copy handler for attachment import.
+- No PDF export handler (`webContents.printToPDF()`).
+
+**Frontend setup (one-time)**
+- **Tailwind CSS is not installed** — `App.tsx` already uses Tailwind classes but `src/package.json` has no Tailwind dependency. Must add and configure before building UI.
+- React Router (or similar) for multi-screen navigation.
+- Global state management (Zustand / Context) for active trip.
+
+**UI screens (all missing)**
+- Trips list / dashboard.
+- Create / edit trip form (title, main currency).
+- Trip detail view with day/step timeline.
+- Step editor (title, day, coordinates, Markdown description).
+- Transport editor (type, route geometry fetch + display).
+- Budget / expenses view with category breakdown and currency conversion.
+- Attachments panel (file picker, preview).
+- PDF export screen (print-optimized `@media print` view).
+
+**Libraries not yet added**
+- Tailwind CSS + autoprefixer (UI).
+- React Router DOM (navigation).
+- Leaflet + react-leaflet (interactive map).
+- A Markdown WYSIWYG editor (e.g. TipTap).
+- A charting library (e.g. Recharts) for budget breakdown.
+- A currency-conversion utility (e.g. `currency.js` or manual rates table for offline use).
+- `uuid` package for client-side UUID generation.
 
 ## Development workflow
 
@@ -51,7 +106,7 @@ Two processes must run simultaneously in dev:
 cd src
 npm run dev
 
-# Terminal 2 — Electron (main process)
+# Terminal 2 — Electron (main process, loads http://localhost:5173)
 npm start
 ```
 
@@ -82,6 +137,8 @@ npm start        # electron .
 ## Coding standards
 
 - `main/` — pure `.js` (CommonJS, `require`/`module.exports`). No TypeScript compilation needed here.
-- `src/` — strictly typed `.tsx`/`.ts` (ES modules). Never import anything from `main/` in the renderer.
+- `src/src/` — strictly typed `.tsx`/`.ts` (ES modules). Never import anything from `main/` in the renderer.
 - `main/database.js` is main-process only; it must never be bundled into the renderer.
 - `src/` package uses `"type": "module"`; root package uses `"type": "commonjs"` — don't mix syntax across the boundary.
+- IPC channel names use kebab-case (e.g. `trips:getAll`, `steps:create`).
+- Add new IPC channels to both `main/main.js` (handler) and `main/preload.js` (bridge) and `src/src/global.d.ts` (type) together.
